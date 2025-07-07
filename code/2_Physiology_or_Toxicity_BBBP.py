@@ -402,7 +402,8 @@ def eval(model, dataset):
 # %%
 # Inference on a single SMILES string
 model_filepath = 'saved_models/model_BBBP_Mon_Jul__7_23-17-57_2025_327.pt'
-smile_to_test = 'O=C(C)Oc1ccccc1C(=O)O' # Aspirin
+smile_to_test = 'CCC1(C)CC(=O)NC(=O)C1' # Aspirin
+# smile_to_test = 'O=C(C)Oc1ccccc1C(=O)O' # Aspirin
 
 if os.path.isfile(model_filepath):
     pretty_print(f"Loading model from {model_filepath}", pb=True)
@@ -449,3 +450,21 @@ if os.path.isfile(model_filepath):
 
 else:
     print(f"Model file not found at: {model_filepath}")
+
+# %%
+smile = smile_to_test
+ai_x_atom, ai_x_bonds, ai_x_atom_index, ai_x_bond_index, ai_x_mask = featurize_smiles_from_dict(smile, feature_dicts)
+orig_x_atom, orig_x_bonds, orig_x_atom_index, orig_x_bond_index, orig_x_mask, smiles_to_rdkit_list = get_smiles_array([smile],feature_dicts)
+
+print("x_atom", ai_x_atom.shape, orig_x_atom.shape)
+np.testing.assert_array_equal(ai_x_atom, orig_x_atom)
+print("x_bonds", ai_x_bonds.shape, orig_x_bonds.shape)
+np.testing.assert_array_equal(ai_x_bonds, orig_x_bonds)
+print("x_atom_index", ai_x_atom_index.shape, orig_x_atom_index.shape)
+np.testing.assert_array_equal(ai_x_atom_index, orig_x_atom_index)
+print("x_bond_index", ai_x_bond_index.shape, orig_x_bond_index.shape)
+np.testing.assert_array_equal(ai_x_bond_index, orig_x_bond_index)
+print("x_mask", ai_x_mask.shape, orig_x_mask.shape)
+np.testing.assert_array_equal(ai_x_mask, orig_x_mask)
+
+# %%

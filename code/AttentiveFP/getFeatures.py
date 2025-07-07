@@ -579,6 +579,7 @@ def featurize_smiles_from_dict(smiles, feature_dicts):
     
     # These are the indices for the padding atoms/bonds
     max_atom_index_num = max_atom_len - 1
+    max_bond_index_num = max_bond_len - 1
     
     degrees = [0, 1, 2, 3, 4, 5]
 
@@ -600,11 +601,11 @@ def featurize_smiles_from_dict(smiles, feature_dicts):
     mask = np.zeros((max_atom_len), dtype=np.float32)
     atoms = np.zeros((max_atom_len, num_atom_features), dtype=np.float32)
     bonds = np.zeros((max_bond_len, num_bond_features), dtype=np.float32)
-    atom_neighbors = np.zeros((max_atom_len, len(degrees)), dtype=np.int32)
-    bond_neighbors = np.zeros((max_atom_len, len(degrees)), dtype=np.int32)
+    atom_neighbors = np.zeros((max_atom_len, len(degrees)), dtype=np.float32)
+    bond_neighbors = np.zeros((max_atom_len, len(degrees)), dtype=np.float32)
 
     atom_neighbors.fill(max_atom_index_num)
-    bond_neighbors.fill(max_atom_index_num)
+    bond_neighbors.fill(max_bond_index_num)
 
     for i, feature in enumerate(atom_features):
         mask[i] = 1.0
