@@ -456,6 +456,7 @@ smile = smile_to_test
 ai_x_atom, ai_x_bonds, ai_x_atom_index, ai_x_bond_index, ai_x_mask = featurize_smiles_from_dict(smile, feature_dicts)
 orig_x_atom, orig_x_bonds, orig_x_atom_index, orig_x_bond_index, orig_x_mask, smiles_to_rdkit_list = get_smiles_array([smile],feature_dicts)
 
+print("Is equal?")
 print("x_atom", ai_x_atom.shape, orig_x_atom.shape)
 np.testing.assert_array_equal(ai_x_atom, orig_x_atom)
 print("x_bonds", ai_x_bonds.shape, orig_x_bonds.shape)
