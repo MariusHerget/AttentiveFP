@@ -12,6 +12,7 @@
 #     language: python
 #     name: python3
 # ---
+
 # %%
 ### Helper Functions and global settings
 FORCE_CPU = False
@@ -211,6 +212,10 @@ train_df = training_data.drop(valid_df.index) # train set
 train_df = train_df.reset_index(drop=True)
 valid_df = valid_df.reset_index(drop=True)
 test_df = test_df.reset_index(drop=True)
+
+valid_df.to_csv('sets/valid_df.csv')
+train_df.to_csv('sets/train_df.csv')
+test_df.to_csv('sets/test_df.csv')
 
 
 # %%
