@@ -88,7 +88,7 @@ import pickle
 import copy
 import pandas as pd
 #then import my own modules
-from AttentiveFP import Fingerprint, Fingerprint_viz, save_smiles_dicts, get_smiles_dicts, get_smiles_array, moltosvg_highlight
+from AttentiveFP import Fingerprint, Fingerprint_viz, save_smiles_dicts, get_smiles_dicts, get_smiles_array, moltosvg_highlight, featurize_smiles_from_dict
 
 
 # %%
@@ -349,103 +349,103 @@ def eval(model, dataset):
 
 
 # %%
-best_param ={}
-best_param["roc_epoch"] = 0
-best_param["loss_epoch"] = 0
-best_param["valid_roc"] = 0
-best_param["valid_loss"] = 9e8
+# best_param ={}
+# best_param["roc_epoch"] = 0
+# best_param["loss_epoch"] = 0
+# best_param["valid_roc"] = 0
+# best_param["valid_loss"] = 9e8
 
-for epoch in range(epochs):    
-    train_roc, train_prc, train_precision, train_recall, train_loss = eval(model, train_df)
-    valid_roc, valid_prc, valid_precision, valid_recall, valid_loss = eval(model, valid_df)
-    train_roc_mean = np.array(train_roc).mean()
-    valid_roc_mean = np.array(valid_roc).mean()
+# for epoch in range(epochs):    
+#     train_roc, train_prc, train_precision, train_recall, train_loss = eval(model, train_df)
+#     valid_roc, valid_prc, valid_precision, valid_recall, valid_loss = eval(model, valid_df)
+#     train_roc_mean = np.array(train_roc).mean()
+#     valid_roc_mean = np.array(valid_roc).mean()
 
-#     tensorboard.add_scalars('ROC',{'train_roc':train_roc_mean,'valid_roc':valid_roc_mean},epoch)
-#     tensorboard.add_scalars('Losses',{'train_losses':train_loss,'valid_losses':valid_loss},epoch)
+# #     tensorboard.add_scalars('ROC',{'train_roc':train_roc_mean,'valid_roc':valid_roc_mean},epoch)
+# #     tensorboard.add_scalars('Losses',{'train_losses':train_loss,'valid_losses':valid_loss},epoch)
 
-    if valid_roc_mean > best_param["valid_roc"]:
-        best_param["roc_epoch"] = epoch
-        best_param["valid_roc"] = valid_roc_mean
-        if valid_roc_mean > 0.87:
-             torch.save(model, 'saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(epoch)+'.pt')             
-    if valid_loss < best_param["valid_loss"]:
-        best_param["loss_epoch"] = epoch
-        best_param["valid_loss"] = valid_loss
+#     if valid_roc_mean > best_param["valid_roc"]:
+#         best_param["roc_epoch"] = epoch
+#         best_param["valid_roc"] = valid_roc_mean
+#         if valid_roc_mean > 0.87:
+#              torch.save(model, 'saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(epoch)+'.pt')             
+#     if valid_loss < best_param["valid_loss"]:
+#         best_param["loss_epoch"] = epoch
+#         best_param["valid_loss"] = valid_loss
 
-    pretty_print(f"EPOCH: {epoch}", pb=3 if epoch == 0 else False)
-    pretty_print(f"train_roc: {train_roc}")
-    pretty_print(f"valid_roc: {valid_roc}", pa=True)
+#     pretty_print(f"EPOCH: {epoch}", pb=3 if epoch == 0 else False)
+#     pretty_print(f"train_roc: {train_roc}")
+#     pretty_print(f"valid_roc: {valid_roc}", pa=True)
 
-    if (epoch - best_param["roc_epoch"] >18) and (epoch - best_param["loss_epoch"] >28):        
-        break
+#     if (epoch - best_param["roc_epoch"] >18) and (epoch - best_param["loss_epoch"] >28):        
+#         break
 
-    train(model, train_df, optimizer, loss_function)
-
-
-# %%
-# evaluate model
-best_model = torch.load('saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(best_param["roc_epoch"])+'.pt')     
-
-# best_model_dict = best_model.state_dict()
-# best_model_wts = copy.deepcopy(best_model_dict)
-
-# model.load_state_dict(best_model_wts)
-# (best_model.align[0].weight == model.align[0].weight).all()
-
-test_roc, test_prc, test_precision, test_recall, test_losses = eval(best_model, test_df)
-
-pretty_print(f"best epoch: {best_param['roc_epoch']}", pb=True)
-pretty_print(f"test_roc: {test_roc}")
-pretty_print(f"test_roc_mean: {np.array(test_roc).mean()}", pa=True)
+#     train(model, train_df, optimizer, loss_function)
 
 
 # %%
-model_filepath = 'saved_models/model_BBBP_Mon_Jul__7_23-17-57_2025_327.pt'
+# # evaluate model
+# best_model = torch.load('saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(best_param["roc_epoch"])+'.pt')     
+
+# # best_model_dict = best_model.state_dict()
+# # best_model_wts = copy.deepcopy(best_model_dict)
+
+# # model.load_state_dict(best_model_wts)
+# # (best_model.align[0].weight == model.align[0].weight).all()
+
+# test_roc, test_prc, test_precision, test_recall, test_losses = eval(best_model, test_df)
+
+# pretty_print(f"best epoch: {best_param['roc_epoch']}", pb=True)
+# pretty_print(f"test_roc: {test_roc}")
+# pretty_print(f"test_roc_mean: {np.array(test_roc).mean()}", pa=True)
 
 # %%
 # Inference on a single SMILES string
-# You can change smile_to_test to any other SMILES string.
-# Note: For a new SMILES not in the dataset, the featurization process would need to be
-# adapted to use the same padding and feature dimensions as the training set.
-# Here, we use a molecule from the test set for demonstration.
-smile_to_test = test_df.cano_smiles.values[0]
-actual_value = test_df.BBBP.values[0]
+model_filepath = 'saved_models/model_BBBP_Mon_Jul__7_23-17-57_2025_327.pt'
+smile_to_test = 'O=C(C)Oc1ccccc1C(=O)O' # Aspirin
 
 if os.path.isfile(model_filepath):
     pretty_print(f"Loading model from {model_filepath}", pb=True)
-    model = torch.load(model_filepath, map_location=device)
+    model = torch.load(model_filepath, map_location=device, weights_only=False)
     model.eval()
 
     pretty_print(f"Running inference for SMILES: {smile_to_test}")
-    pretty_print(f"Actual BBBP value: {actual_value}")
 
-    # Featurize the SMILES string using the feature dictionaries from the dataset
-    x_atom, x_bonds, x_atom_index, x_bond_index, x_mask, _ = get_smiles_array([smile_to_test], feature_dicts)
+    try:
+        # Featurize the SMILES string using the new function
+        x_atom, x_bonds, x_atom_index, x_bond_index, x_mask = featurize_smiles_from_dict(smile_to_test, feature_dicts)
 
-    # Convert numpy arrays to tensors
-    x_atom_tensor = torch.tensor(x_atom)
-    x_bonds_tensor = torch.tensor(x_bonds)
-    x_atom_index_tensor = torch.tensor(x_atom_index, dtype=torch.long)
-    x_bond_index_tensor = torch.tensor(x_bond_index, dtype=torch.long)
-    x_mask_tensor = torch.tensor(x_mask)
-    
-    # Perform prediction
-    with torch.no_grad():
-        _, mol_prediction = model(x_atom_tensor, x_bonds_tensor, x_atom_index_tensor, x_bond_index_tensor, x_mask_tensor)
+        # Convert numpy arrays to tensors
+        x_atom_tensor = torch.tensor(x_atom)
+        x_bonds_tensor = torch.tensor(x_bonds)
+        x_atom_index_tensor = torch.tensor(x_atom_index, dtype=torch.long)
+        x_bond_index_tensor = torch.tensor(x_bond_index, dtype=torch.long)
+        x_mask_tensor = torch.tensor(x_mask)
+        
+        # Perform prediction
+        with torch.no_grad():
+            _, mol_prediction = model(x_atom_tensor, x_bonds_tensor, x_atom_index_tensor, x_bond_index_tensor, x_mask_tensor)
 
-    # Process the output
-    probabilities = F.softmax(mol_prediction, dim=1)
-    prob_class_0 = probabilities[0, 0].item()
-    prob_class_1 = probabilities[0, 1].item()
-    predicted_class = torch.argmax(probabilities, dim=1).item()
+        # Process the output
+        probabilities = F.softmax(mol_prediction, dim=1)
+        prob_class_0 = probabilities[0, 0].item()
+        prob_class_1 = probabilities[0, 1].item()
+        predicted_class = torch.argmax(probabilities, dim=1).item()
 
-    pretty_print(f"Raw model output (logits): {mol_prediction.numpy().flatten()}", pa=True)
-    
-    pretty_print(f"Prediction for SMILES: {smile_to_test}", pb=True)
-    pretty_print(f"Probability of NOT crossing BBB (class 0): {prob_class_0:.4f}")
-    pretty_print(f"Probability of crossing BBB (class 1): {prob_class_1:.4f}")
-    pretty_print(f"Predicted class: {predicted_class} ({'Crosses BBB' if predicted_class == 1 else 'Does not cross BBB'})", pa=True)
+        pretty_print(f"Raw model output (logits): {mol_prediction.cpu().numpy().flatten()}", pa=True)
+
+        # BBBP classification (1: Penetrates, 0: Doesn't Penetrate)
+        
+        pretty_print(f"Prediction for SMILES: {smile_to_test}", pb=True)
+        pretty_print(f"Probability of NOT crossing BBB (class 0): {prob_class_0:.4f}")
+        pretty_print(f"Probability of crossing BBB (class 1): {prob_class_1:.4f}")
+        pretty_print(f"Predicted class: {predicted_class} ({'Crosses BBB' if predicted_class == 1 else 'Does not cross BBB'})", pa=True)
+
+    except ValueError as e:
+        print(f"Error featurizing SMILES: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
 
 else:
-    pretty_print(f"Model file not found at: {model_filepath}", pb=True, pa=True)
+    print(f"Model file not found at: {model_filepath}")
