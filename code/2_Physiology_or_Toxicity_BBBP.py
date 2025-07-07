@@ -1,12 +1,22 @@
-#!/usr/bin/env python
-# coding: utf-8
+# ---
+# jupyter:
+#   jupytext:
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.17.2
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
 
-# In[1]:
+# %%
 
 
 import os
-#os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
-#os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -43,7 +53,7 @@ print("Using device: ", out_device)
 print("########################")
 
 
-# In[2]:
+# %%
 
 
 import time
@@ -61,7 +71,7 @@ import pandas as pd
 from AttentiveFP import Fingerprint, Fingerprint_viz, save_smiles_dicts, get_smiles_dicts, get_smiles_array, moltosvg_highlight
 
 
-# In[3]:
+# %%
 
 
 from sklearn.metrics import roc_auc_score
@@ -77,7 +87,7 @@ from sklearn.metrics import auc
 from sklearn.metrics import f1_score
 
 
-# In[4]:
+# %%
 
 
 # from rdkit.Chem import rdMolDescriptors, MolSurf
@@ -94,7 +104,7 @@ from IPython.display import SVG, display
 import seaborn as sns; sns.set(color_codes=True)
 
 
-# In[5]:
+# %%
 
 
 task_name = 'BBBP'
@@ -135,7 +145,7 @@ plt.close()
 # print(len([i for i in atom_num_dist if i<51]),len([i for i in atom_num_dist if i>50]))
 
 
-# In[6]:
+# %%
 
 
 random_seed = 188
@@ -156,7 +166,7 @@ per_task_output_units_num = 2 # for classification model with 2 classes
 output_units_num = len(tasks) * per_task_output_units_num
 
 
-# In[7]:
+# %%
 
 
 smilesList = [smiles for smiles in canonical_smiles_list if len(Chem.MolFromSmiles(smiles).GetAtoms())<101]
@@ -175,7 +185,7 @@ uncovered_df = smiles_tasks_df.drop(remained_df.index)
 uncovered_df
 
 
-# In[8]:
+# %%
 
 
 weights = []
@@ -196,7 +206,7 @@ valid_df = valid_df.reset_index(drop=True)
 test_df = test_df.reset_index(drop=True)
 
 
-# In[9]:
+# %%
 
 
 x_atom, x_bonds, x_atom_index, x_bond_index, x_mask, smiles_to_rdkit_list = get_smiles_array([smilesList[0]],feature_dicts)
@@ -220,7 +230,7 @@ for name, param in model.named_parameters():
 
 
 
-# In[14]:
+# %%
 
 
 def train(model, dataset, optimizer, loss_function):
@@ -330,7 +340,7 @@ def eval(model, dataset):
     return test_roc, test_prc, test_precision, test_recall, test_loss
 
 
-# In[13]:
+# %%
 
 
 best_param ={}
@@ -369,7 +379,7 @@ for epoch in range(epochs):
     train(model, train_df, optimizer, loss_function)
 
 
-# In[ ]:
+# %%
 
 
 # evaluate model
@@ -389,7 +399,7 @@ print("best epoch:"+str(best_param["roc_epoch"])
      )
 
 
-# In[ ]:
+# %%
 
 
 

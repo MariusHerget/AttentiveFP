@@ -10,6 +10,7 @@ saved_models/
 *.pkl.tar.gz
 *.pkl.tar.bz2
 *.pkl.tar.xz
+*.backup
 
 ################################################
 ### https://raw.githubusercontent.com/github/gitignore/refs/heads/main/Python.gitignore
