@@ -399,3 +399,53 @@ pretty_print(f"best epoch: {best_param['roc_epoch']}", pb=True)
 pretty_print(f"test_roc: {test_roc}")
 pretty_print(f"test_roc_mean: {np.array(test_roc).mean()}", pa=True)
 
+
+# %%
+model_filepath = 'saved_models/model_BBBP_Mon_Jul__7_23-17-57_2025_327.pt'
+
+# %%
+# Inference on a single SMILES string
+# You can change smile_to_test to any other SMILES string.
+# Note: For a new SMILES not in the dataset, the featurization process would need to be
+# adapted to use the same padding and feature dimensions as the training set.
+# Here, we use a molecule from the test set for demonstration.
+smile_to_test = test_df.cano_smiles.values[0]
+actual_value = test_df.BBBP.values[0]
+
+if os.path.isfile(model_filepath):
+    pretty_print(f"Loading model from {model_filepath}", pb=True)
+    model = torch.load(model_filepath, map_location=device)
+    model.eval()
+
+    pretty_print(f"Running inference for SMILES: {smile_to_test}")
+    pretty_print(f"Actual BBBP value: {actual_value}")
+
+    # Featurize the SMILES string using the feature dictionaries from the dataset
+    x_atom, x_bonds, x_atom_index, x_bond_index, x_mask, _ = get_smiles_array([smile_to_test], feature_dicts)
+
+    # Convert numpy arrays to tensors
+    x_atom_tensor = torch.tensor(x_atom)
+    x_bonds_tensor = torch.tensor(x_bonds)
+    x_atom_index_tensor = torch.tensor(x_atom_index, dtype=torch.long)
+    x_bond_index_tensor = torch.tensor(x_bond_index, dtype=torch.long)
+    x_mask_tensor = torch.tensor(x_mask)
+    
+    # Perform prediction
+    with torch.no_grad():
+        _, mol_prediction = model(x_atom_tensor, x_bonds_tensor, x_atom_index_tensor, x_bond_index_tensor, x_mask_tensor)
+
+    # Process the output
+    probabilities = F.softmax(mol_prediction, dim=1)
+    prob_class_0 = probabilities[0, 0].item()
+    prob_class_1 = probabilities[0, 1].item()
+    predicted_class = torch.argmax(probabilities, dim=1).item()
+
+    pretty_print(f"Raw model output (logits): {mol_prediction.numpy().flatten()}", pa=True)
+    
+    pretty_print(f"Prediction for SMILES: {smile_to_test}", pb=True)
+    pretty_print(f"Probability of NOT crossing BBB (class 0): {prob_class_0:.4f}")
+    pretty_print(f"Probability of crossing BBB (class 1): {prob_class_1:.4f}")
+    pretty_print(f"Predicted class: {predicted_class} ({'Crosses BBB' if predicted_class == 1 else 'Does not cross BBB'})", pa=True)
+
+else:
+    pretty_print(f"Model file not found at: {model_filepath}", pb=True, pa=True)
