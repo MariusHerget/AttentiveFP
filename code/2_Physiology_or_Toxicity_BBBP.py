@@ -12,26 +12,49 @@
 #     language: python
 #     name: python3
 # ---
-
 # %%
+### Helper Functions and global settings
+FORCE_CPU = False
+line_length = 60
+def pretty_print_divider(n=1, lb_n=0, char="#"):
+    if isinstance(n, bool):
+        n = 1 if n else 0
+    if lb_n > 0:
+        print("\n" * lb_n, end="")
+    elif n > 1:
+        print()
+    for _ in range(n):
+        print(char * line_length)
 
-
+def pretty_print(message, pb=False, pa=False, lb_n=0, char="#"):
+    pretty_print_divider(pb, lb_n=lb_n, char=char)
+    available_space = line_length - 7
+    formatted_message = f"{char * 3} {message}"
+    padding = line_length - len(formatted_message) - 4
+    if padding < 0:
+        formatted_message = formatted_message[:line_length-7] + "..."
+        padding = 0
+    print(formatted_message + " " * padding + f" {char * 3}")
+    pretty_print_divider(pa, char=char)
+# %%
 import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data as Data
+
 torch.manual_seed(8) # for reproduce
-if torch.cuda.is_available():
+# Dynamically set the device to use (either GPU or CPU)
+if torch.cuda.is_available() and not FORCE_CPU:
     device_count = torch.cuda.device_count()
     if device_count > 1:
-        print(f"### multiple GPUs detected ({device_count})")
+        pretty_print(f"multiple GPUs detected ({device_count})", pb=True)
         best_device_id = -1
         max_free_mem = 0
         for i in range(device_count):
-            print(f"### GPU {i} free memory: {torch.cuda.mem_get_info(i)[0]}")
             free, _ = torch.cuda.mem_get_info(i)
+            pretty_print(f"GPU {i} free memory: {free}")
             if free > max_free_mem:
                 max_free_mem = free
                 best_device_id = i
@@ -48,14 +71,10 @@ torch.set_default_device(device)
 torch.set_default_dtype(torch.float32)
 torch.nn.Module.dump_patches = True
 
-print("########################")
-print("Using device: ", out_device)
-print("########################")
+pretty_print(f"Using device: {out_device}", pb=True, pa=True)
 
 
 # %%
-
-
 import time
 import numpy as np
 import gc
@@ -72,8 +91,6 @@ from AttentiveFP import Fingerprint, Fingerprint_viz, save_smiles_dicts, get_smi
 
 
 # %%
-
-
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import matthews_corrcoef
 from sklearn.metrics import recall_score
@@ -88,8 +105,6 @@ from sklearn.metrics import f1_score
 
 
 # %%
-
-
 # from rdkit.Chem import rdMolDescriptors, MolSurf
 # from rdkit.Chem.Draw import SimilarityMaps
 from rdkit import Chem
@@ -105,8 +120,6 @@ import seaborn as sns; sns.set(color_codes=True)
 
 
 # %%
-
-
 task_name = 'BBBP'
 tasks = ['BBBP']
 raw_filename = "../data/BBBP.csv"
@@ -115,7 +128,7 @@ filename = raw_filename.replace('.csv','')
 prefix_filename = raw_filename.split('/')[-1].replace('.csv','')
 smiles_tasks_df = pd.read_csv(raw_filename)
 smilesList = smiles_tasks_df.smiles.values
-print("number of all smiles: ",len(smilesList))
+pretty_print(f"number of all smiles: {len(smilesList)}")
 atom_num_dist = []
 remained_smiles = []
 canonical_smiles_list = []
@@ -126,9 +139,9 @@ for smiles in smilesList:
         remained_smiles.append(smiles)
         canonical_smiles_list.append(Chem.MolToSmiles(Chem.MolFromSmiles(smiles), isomericSmiles=True))
     except:
-        print("not successfully processed smiles: ", smiles)
+        pretty_print(f"not successfully processed smiles: {smiles}")
         pass
-print("number of successfully processed smiles: ", len(remained_smiles))
+pretty_print(f"number of successfully processed smiles: {len(remained_smiles)}")
 smiles_tasks_df = smiles_tasks_df[smiles_tasks_df["smiles"].isin(remained_smiles)]
 # print(smiles_tasks_df)
 smiles_tasks_df['cano_smiles'] =canonical_smiles_list
@@ -146,8 +159,6 @@ plt.close()
 
 
 # %%
-
-
 random_seed = 188
 random_seed = int(time.time())
 start_time = str(time.ctime()).replace(':','-').replace(' ','_')
@@ -167,8 +178,6 @@ output_units_num = len(tasks) * per_task_output_units_num
 
 
 # %%
-
-
 smilesList = [smiles for smiles in canonical_smiles_list if len(Chem.MolFromSmiles(smiles).GetAtoms())<101]
 uncovered = [smiles for smiles in canonical_smiles_list if len(Chem.MolFromSmiles(smiles).GetAtoms())>100]
 
@@ -186,8 +195,6 @@ uncovered_df
 
 
 # %%
-
-
 weights = []
 for i,task in enumerate(tasks):    
     negative_df = remained_df[remained_df[task] == 0][["smiles",task]]
@@ -207,8 +214,6 @@ test_df = test_df.reset_index(drop=True)
 
 
 # %%
-
-
 x_atom, x_bonds, x_atom_index, x_bond_index, x_mask, smiles_to_rdkit_list = get_smiles_array([smilesList[0]],feature_dicts)
 num_atom_features = x_atom.shape[-1]
 num_bond_features = x_bonds.shape[-1]
@@ -223,16 +228,14 @@ model.to(device)
 optimizer = optim.Adam(model.parameters(), 10**-learning_rate, weight_decay=10**-weight_decay)
 model_parameters = filter(lambda p: p.requires_grad, model.parameters())
 params = sum([np.prod(p.size()) for p in model_parameters])
-print(params)
+pretty_print(f"Number of parameters: {params}")
 for name, param in model.named_parameters():
     if param.requires_grad:
-        print(name, param.data.shape)
+        pretty_print(f"{name} {param.data.shape}")
 
 
 
 # %%
-
-
 def train(model, dataset, optimizer, loss_function):
     model.train()
     np.random.seed(epoch)
@@ -341,8 +344,6 @@ def eval(model, dataset):
 
 
 # %%
-
-
 best_param ={}
 best_param["roc_epoch"] = 0
 best_param["loss_epoch"] = 0
@@ -367,12 +368,10 @@ for epoch in range(epochs):
         best_param["loss_epoch"] = epoch
         best_param["valid_loss"] = valid_loss
 
-    print("EPOCH:\t"+str(epoch)+'\n'\
-        +"train_roc"+":"+str(train_roc)+'\n'\
-        +"valid_roc"+":"+str(valid_roc)+'\n'\
-#         +"train_roc_mean"+":"+str(train_roc_mean)+'\n'\
-#         +"valid_roc_mean"+":"+str(valid_roc_mean)+'\n'\
-        )
+    pretty_print(f"EPOCH: {epoch}", pb=3 if epoch == 0 else False)
+    pretty_print(f"train_roc: {train_roc}")
+    pretty_print(f"valid_roc: {valid_roc}", pa=True)
+
     if (epoch - best_param["roc_epoch"] >18) and (epoch - best_param["loss_epoch"] >28):        
         break
 
@@ -380,8 +379,6 @@ for epoch in range(epochs):
 
 
 # %%
-
-
 # evaluate model
 best_model = torch.load('saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(best_param["roc_epoch"])+'.pt')     
 
@@ -393,14 +390,7 @@ best_model = torch.load('saved_models/model_'+prefix_filename+'_'+start_time+'_'
 
 test_roc, test_prc, test_precision, test_recall, test_losses = eval(best_model, test_df)
 
-print("best epoch:"+str(best_param["roc_epoch"])
-      +"\n"+"test_roc:"+str(test_roc)
-      +"\n"+"test_roc_mean:",str(np.array(test_roc).mean())
-     )
-
-
-# %%
-
-
-
+pretty_print(f"best epoch: {best_param['roc_epoch']}", pb=True)
+pretty_print(f"test_roc: {test_roc}")
+pretty_print(f"test_roc_mean: {np.array(test_roc).mean()}", pa=True)
 
