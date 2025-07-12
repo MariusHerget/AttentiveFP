@@ -16,6 +16,7 @@
 # %%
 ### Helper Functions and global settings
 FORCE_CPU = False
+RECREATE_SETS = False
 line_length = 60
 def pretty_print_divider(n=1, lb_n=0, char="#"):
     if isinstance(n, bool):
@@ -204,20 +205,25 @@ for i,task in enumerate(tasks):
     positive_df = remained_df[remained_df[task] == 1][["smiles",task]]
     weights.append([(positive_df.shape[0]+negative_df.shape[0])/negative_df.shape[0],\
                     (positive_df.shape[0]+negative_df.shape[0])/positive_df.shape[0]])
+    
+if not RECREATE_SETS:
+    valid_df = pd.read_csv("sets/valid_df.csv")
+    train_df = pd.read_csv("sets/train_df.csv")
+    test_df = pd.read_csv("sets/test_df.csv")
+else:    
+    test_df = remained_df.sample(frac=1/10, random_state=random_seed) # test set
+    training_data = remained_df.drop(test_df.index) # training data
 
-test_df = remained_df.sample(frac=1/10, random_state=random_seed) # test set
-training_data = remained_df.drop(test_df.index) # training data
+    # training data is further divided into validation set and train set
+    valid_df = training_data.sample(frac=1/9, random_state=random_seed) # validation set
+    train_df = training_data.drop(valid_df.index) # train set
+    train_df = train_df.reset_index(drop=True)
+    valid_df = valid_df.reset_index(drop=True)
+    test_df = test_df.reset_index(drop=True)
 
-# training data is further divided into validation set and train set
-valid_df = training_data.sample(frac=1/9, random_state=random_seed) # validation set
-train_df = training_data.drop(valid_df.index) # train set
-train_df = train_df.reset_index(drop=True)
-valid_df = valid_df.reset_index(drop=True)
-test_df = test_df.reset_index(drop=True)
-
-valid_df.to_csv('sets/valid_df.csv')
-train_df.to_csv('sets/train_df.csv')
-test_df.to_csv('sets/test_df.csv')
+    valid_df.to_csv('sets/valid_df.csv')
+    train_df.to_csv('sets/train_df.csv')
+    test_df.to_csv('sets/test_df.csv')
 
 
 # %%
@@ -351,107 +357,137 @@ def eval(model, dataset):
 
 
 # %%
-# best_param ={}
-# best_param["roc_epoch"] = 0
-# best_param["loss_epoch"] = 0
-# best_param["valid_roc"] = 0
-# best_param["valid_loss"] = 9e8
+best_param ={}
+best_param["roc_epoch"] = 0
+best_param["loss_epoch"] = 0
+best_param["valid_roc"] = 0
+best_param["valid_loss"] = 9e8
 
-# epoch_meta = {}
+epoch_meta = {}
 
-# for epoch in range(epochs):    
-#     train_roc, train_prc, train_precision, train_recall, train_loss = eval(model, train_df)
-#     valid_roc, valid_prc, valid_precision, valid_recall, valid_loss = eval(model, valid_df)
-#     train_roc_mean = np.array(train_roc).mean()
-#     valid_roc_mean = np.array(valid_roc).mean()
-#     epoch_meta[epoch] = {
-#         'train_roc': train_roc,
-#         'train_prc': train_prc,
-#         'train_precision': train_precision,
-#         'train_recall': train_recall,
-#         'train_loss': train_loss,
-#         'valid_roc': valid_roc,
-#         'valid_prc': valid_prc,
-#         'valid_precision': valid_precision,
-#         'valid_recall': valid_recall,
-#         'valid_loss': valid_loss
-#     }
+for epoch in range(epochs):    
+    train_roc, train_prc, train_precision, train_recall, train_loss = eval(model, train_df)
+    valid_roc, valid_prc, valid_precision, valid_recall, valid_loss = eval(model, valid_df)
+    train_roc_mean = np.array(train_roc).mean()
+    valid_roc_mean = np.array(valid_roc).mean()
+    epoch_meta[epoch] = {
+        'train_roc': train_roc,
+        'train_prc': train_prc,
+        'train_precision': train_precision,
+        'train_recall': train_recall,
+        'train_loss': train_loss,
+        'valid_roc': valid_roc,
+        'valid_prc': valid_prc,
+        'valid_precision': valid_precision,
+        'valid_recall': valid_recall,
+        'valid_loss': valid_loss
+    }
 
-#     # tensorboard.add_scalars('ROC',{'train_roc':train_roc_mean,'valid_roc':valid_roc_mean},epoch)
-#     # tensorboard.add_scalars('Losses',{'train_losses':train_loss,'valid_losses':valid_loss},epoch)
+    # tensorboard.add_scalars('ROC',{'train_roc':train_roc_mean,'valid_roc':valid_roc_mean},epoch)
+    # tensorboard.add_scalars('Losses',{'train_losses':train_loss,'valid_losses':valid_loss},epoch)
 
-#     if valid_roc_mean > best_param["valid_roc"]:
-#         best_param["roc_epoch"] = epoch
-#         best_param["valid_roc"] = valid_roc_mean
+    if valid_roc_mean > best_param["valid_roc"]:
+        best_param["roc_epoch"] = epoch
+        best_param["valid_roc"] = valid_roc_mean
         
-#         if valid_roc_mean > 0.87:
-#             name = 'saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(epoch)+'.pt'
-#             torch.save(model, name)  
-#             torch.save({
-#                 'epoch': epoch,
-#                 'model_state_dict': model.state_dict(),
-#                 'optimizer_state_dict': optimizer.state_dict(),
-#                 'train_roc': train_roc,
-#                 'train_prc': train_prc,
-#                 'train_precision': train_precision,
-#                 'train_recall': train_recall,
-#                 'train_loss': train_loss,
-#                 'valid_roc': valid_roc,
-#                 'valid_prc': valid_prc,
-#                 'valid_precision': valid_precision,
-#                 'valid_recall': valid_recall,
-#                 'valid_loss': valid_loss
-#             }, name+'h')
-#             pd.DataFrame.from_dict(epoch_meta).transpose().to_csv('saved_models/epoch_metadata.csv')
-#             torch.save({
-#                 'epoch': epoch,
-#                 'model_state_dict': model.state_dict(),
-#                 'optimizer_state_dict': optimizer.state_dict(),
-#                 'train_roc': train_roc,
-#                 'train_prc': train_prc,
-#                 'train_precision': train_precision,
-#                 'train_recall': train_recall,
-#                 'train_loss': train_loss,
-#                 'valid_roc': valid_roc,
-#                 'valid_prc': valid_prc,
-#                 'valid_precision': valid_precision,
-#                 'valid_recall': valid_recall,
-#                 'valid_loss': valid_loss
-#             }, 'saved_models/best_model.pth')
-#             torch.save(model, 'saved_models/best_model.pt')  
+        if valid_roc_mean > 0.87:
+            name = 'saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(epoch)+'.pt'
+            torch.save(model, name)  
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_roc': train_roc,
+                'train_prc': train_prc,
+                'train_precision': train_precision,
+                'train_recall': train_recall,
+                'train_loss': train_loss,
+                'valid_roc': valid_roc,
+                'valid_prc': valid_prc,
+                'valid_precision': valid_precision,
+                'valid_recall': valid_recall,
+                'valid_loss': valid_loss
+            }, name+'h')
+            pd.DataFrame.from_dict(epoch_meta).transpose().to_csv('saved_models/epoch_metadata.csv')
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_roc': train_roc,
+                'train_prc': train_prc,
+                'train_precision': train_precision,
+                'train_recall': train_recall,
+                'train_loss': train_loss,
+                'valid_roc': valid_roc,
+                'valid_prc': valid_prc,
+                'valid_precision': valid_precision,
+                'valid_recall': valid_recall,
+                'valid_loss': valid_loss
+            }, 'saved_models/best_model.pth')
+            torch.save(model, 'saved_models/best_model.pt')  
 
 
-#     if valid_loss < best_param["valid_loss"]:
-#         best_param["loss_epoch"] = epoch
-#         best_param["valid_loss"] = valid_loss
+    if valid_loss < best_param["valid_loss"]:
+        best_param["loss_epoch"] = epoch
+        best_param["valid_loss"] = valid_loss
 
-#     pretty_print(f"EPOCH: {epoch}", pb=3 if epoch == 0 else False)
-#     pretty_print(f"train_roc: {train_roc}")
-#     pretty_print(f"valid_roc: {valid_roc}", pa=True)
+    pretty_print(f"EPOCH: {epoch}", pb=3 if epoch == 0 else False)
+    pretty_print(f"train_roc: {train_roc}")
+    pretty_print(f"valid_roc: {valid_roc}", pa=True)
 
-#     if (epoch - best_param["roc_epoch"] >18) and (epoch - best_param["loss_epoch"] >28):        
-#         break
+    if (epoch - best_param["roc_epoch"] > 50) and (epoch - best_param["loss_epoch"] > 75):        
+        break
 
-#     train(model, train_df, optimizer, loss_function)
-# pd.DataFrame.from_dict(epoch_meta).to_csv('saved_models/epoch_metadata.csv')
+    train(model, train_df, optimizer, loss_function)
+
+pd.DataFrame.from_dict(epoch_meta).transpose().to_csv('saved_models/epoch_metadata.csv')
+
+tmp_epoch = pd.read_csv('saved_models/epoch_metadata.csv')
+tmp_epoch.transpose().to_csv('saved_models/epoch_metadata.csv')
 
 
 
 # %%
 # evaluate model
-# best_model = torch.load('saved_models/best_model.pt')
+best_model_eval = torch.load('saved_models/best_model.pt')
+best_model = torch.load('saved_models/best_model.pth')
+model.load_state_dict(best_model['model_state_dict'])
+epoch = best_model['epoch']
 
-# # best_model_dict = best_model.state_dict()
-# # best_model_wts = copy.deepcopy(best_model_dict)
 
-# # model.load_state_dict(best_model_wts)
-# # (best_model.align[0].weight == model.align[0].weight).all()
 
-# test_roc, test_prc, test_precision, test_recall, test_losses = eval(best_model, test_df)
+# best_model_dict = best_model.state_dict()
+# best_model_wts = copy.deepcopy(best_model_dict)
 
-# pretty_print(f"best epoch: {best_param['roc_epoch']}", pb=True)
-# pretty_print(f"test_roc: {test_roc}")
-# pretty_print(f"test_roc_mean: {np.array(test_roc).mean()}", pa=True)
+# model.load_state_dict(best_model_wts)
+# (best_model.align[0].weight == model.align[0].weight).all()
+
+test_roc, test_prc, test_precision, test_recall, test_losses = eval(best_model_eval, test_df)
+
+meta_best = {
+    'epoch': best_model['epoch'],
+    'train_roc': best_model['train_roc'],
+    'train_prc': best_model['train_prc'],
+    'train_precision': best_model['train_precision'],
+    'train_recall': best_model['train_recall'],
+    'train_loss': best_model['train_loss'],
+    'valid_roc': best_model['valid_roc'],
+    'valid_prc': best_model['valid_prc'],
+    'valid_precision': best_model['valid_precision'],
+    'valid_recall': best_model['valid_recall'],
+    'valid_loss': best_model['valid_loss'],
+    'test_roc': test_roc,
+    'test_prc': test_prc,
+    'test_precision': test_precision,
+    'test_recall': test_recall,
+    'test_losses': test_losses
+}
+
+pretty_print(f"best epoch: {epoch}", pb=True)
+pretty_print(f"test_roc: {test_roc}")
+pretty_print(f"test_roc_mean: {np.array(test_roc).mean()}", pa=True)
+
+pd.DataFrame.from_dict(meta_best).to_csv('saved_models/best_model_metadata.csv')
 
 # %%
 # Inference on a single SMILES string
