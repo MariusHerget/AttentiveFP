@@ -82,6 +82,8 @@ import gc
 import sys
 sys.setrecursionlimit(50000)
 import pickle
+import json
+import csv
 
 # from tensorboardX import SummaryWriter
 
@@ -355,20 +357,70 @@ def eval(model, dataset):
 # best_param["valid_roc"] = 0
 # best_param["valid_loss"] = 9e8
 
+# epoch_meta = {}
+
 # for epoch in range(epochs):    
 #     train_roc, train_prc, train_precision, train_recall, train_loss = eval(model, train_df)
 #     valid_roc, valid_prc, valid_precision, valid_recall, valid_loss = eval(model, valid_df)
 #     train_roc_mean = np.array(train_roc).mean()
 #     valid_roc_mean = np.array(valid_roc).mean()
+#     epoch_meta[epoch] = {
+#         'train_roc': train_roc,
+#         'train_prc': train_prc,
+#         'train_precision': train_precision,
+#         'train_recall': train_recall,
+#         'train_loss': train_loss,
+#         'valid_roc': valid_roc,
+#         'valid_prc': valid_prc,
+#         'valid_precision': valid_precision,
+#         'valid_recall': valid_recall,
+#         'valid_loss': valid_loss
+#     }
 
-# #     tensorboard.add_scalars('ROC',{'train_roc':train_roc_mean,'valid_roc':valid_roc_mean},epoch)
-# #     tensorboard.add_scalars('Losses',{'train_losses':train_loss,'valid_losses':valid_loss},epoch)
+#     # tensorboard.add_scalars('ROC',{'train_roc':train_roc_mean,'valid_roc':valid_roc_mean},epoch)
+#     # tensorboard.add_scalars('Losses',{'train_losses':train_loss,'valid_losses':valid_loss},epoch)
 
 #     if valid_roc_mean > best_param["valid_roc"]:
 #         best_param["roc_epoch"] = epoch
 #         best_param["valid_roc"] = valid_roc_mean
+        
 #         if valid_roc_mean > 0.87:
-#              torch.save(model, 'saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(epoch)+'.pt')             
+#             name = 'saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(epoch)+'.pt'
+#             torch.save(model, name)  
+#             torch.save({
+#                 'epoch': epoch,
+#                 'model_state_dict': model.state_dict(),
+#                 'optimizer_state_dict': optimizer.state_dict(),
+#                 'train_roc': train_roc,
+#                 'train_prc': train_prc,
+#                 'train_precision': train_precision,
+#                 'train_recall': train_recall,
+#                 'train_loss': train_loss,
+#                 'valid_roc': valid_roc,
+#                 'valid_prc': valid_prc,
+#                 'valid_precision': valid_precision,
+#                 'valid_recall': valid_recall,
+#                 'valid_loss': valid_loss
+#             }, name+'h')
+#             pd.DataFrame.from_dict(epoch_meta).transpose().to_csv('saved_models/epoch_metadata.csv')
+#             torch.save({
+#                 'epoch': epoch,
+#                 'model_state_dict': model.state_dict(),
+#                 'optimizer_state_dict': optimizer.state_dict(),
+#                 'train_roc': train_roc,
+#                 'train_prc': train_prc,
+#                 'train_precision': train_precision,
+#                 'train_recall': train_recall,
+#                 'train_loss': train_loss,
+#                 'valid_roc': valid_roc,
+#                 'valid_prc': valid_prc,
+#                 'valid_precision': valid_precision,
+#                 'valid_recall': valid_recall,
+#                 'valid_loss': valid_loss
+#             }, 'saved_models/best_model.pth')
+#             torch.save(model, 'saved_models/best_model.pt')  
+
+
 #     if valid_loss < best_param["valid_loss"]:
 #         best_param["loss_epoch"] = epoch
 #         best_param["valid_loss"] = valid_loss
@@ -381,11 +433,13 @@ def eval(model, dataset):
 #         break
 
 #     train(model, train_df, optimizer, loss_function)
+# pd.DataFrame.from_dict(epoch_meta).to_csv('saved_models/epoch_metadata.csv')
+
 
 
 # %%
-# # evaluate model
-# best_model = torch.load('saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(best_param["roc_epoch"])+'.pt')     
+# evaluate model
+# best_model = torch.load('saved_models/best_model.pt')
 
 # # best_model_dict = best_model.state_dict()
 # # best_model_wts = copy.deepcopy(best_model_dict)
@@ -401,8 +455,8 @@ def eval(model, dataset):
 
 # %%
 # Inference on a single SMILES string
-model_filepath = 'saved_models/model_BBBP_Mon_Jul__7_23-17-57_2025_327.pt'
-smile_to_test = 'CCC1(C)CC(=O)NC(=O)C1' # Aspirin
+model_filepath = 'saved_models/best_model.pt'
+smile_to_test = 'O=C(C)Oc1ccccc1C(=O)O'
 # smile_to_test = 'O=C(C)Oc1ccccc1C(=O)O' # Aspirin
 
 if os.path.isfile(model_filepath):
@@ -452,20 +506,20 @@ else:
     print(f"Model file not found at: {model_filepath}")
 
 # %%
-smile = smile_to_test
-ai_x_atom, ai_x_bonds, ai_x_atom_index, ai_x_bond_index, ai_x_mask = featurize_smiles_from_dict(smile, feature_dicts)
-orig_x_atom, orig_x_bonds, orig_x_atom_index, orig_x_bond_index, orig_x_mask, smiles_to_rdkit_list = get_smiles_array([smile],feature_dicts)
+# smile = smile_to_test
+# ai_x_atom, ai_x_bonds, ai_x_atom_index, ai_x_bond_index, ai_x_mask = featurize_smiles_from_dict(smile, feature_dicts)
+# orig_x_atom, orig_x_bonds, orig_x_atom_index, orig_x_bond_index, orig_x_mask, smiles_to_rdkit_list = get_smiles_array([smile],feature_dicts)
 
-print("Is equal?")
-print("x_atom", ai_x_atom.shape, orig_x_atom.shape)
-np.testing.assert_array_equal(ai_x_atom, orig_x_atom)
-print("x_bonds", ai_x_bonds.shape, orig_x_bonds.shape)
-np.testing.assert_array_equal(ai_x_bonds, orig_x_bonds)
-print("x_atom_index", ai_x_atom_index.shape, orig_x_atom_index.shape)
-np.testing.assert_array_equal(ai_x_atom_index, orig_x_atom_index)
-print("x_bond_index", ai_x_bond_index.shape, orig_x_bond_index.shape)
-np.testing.assert_array_equal(ai_x_bond_index, orig_x_bond_index)
-print("x_mask", ai_x_mask.shape, orig_x_mask.shape)
-np.testing.assert_array_equal(ai_x_mask, orig_x_mask)
+# print("Is equal?")
+# print("x_atom", ai_x_atom.shape, orig_x_atom.shape)
+# np.testing.assert_array_equal(ai_x_atom, orig_x_atom)
+# print("x_bonds", ai_x_bonds.shape, orig_x_bonds.shape)
+# np.testing.assert_array_equal(ai_x_bonds, orig_x_bonds)
+# print("x_atom_index", ai_x_atom_index.shape, orig_x_atom_index.shape)
+# np.testing.assert_array_equal(ai_x_atom_index, orig_x_atom_index)
+# print("x_bond_index", ai_x_bond_index.shape, orig_x_bond_index.shape)
+# np.testing.assert_array_equal(ai_x_bond_index, orig_x_bond_index)
+# print("x_mask", ai_x_mask.shape, orig_x_mask.shape)
+# np.testing.assert_array_equal(ai_x_mask, orig_x_mask)
 
-# %%
+# # %%
