@@ -16,7 +16,7 @@
 # %%
 ### Helper Functions and global settings
 FORCE_CPU = False
-RECREATE_SETS = False
+RECREATE_SETS = True
 line_length = 60
 def pretty_print_divider(n=1, lb_n=0, char="#"):
     if isinstance(n, bool):
@@ -163,7 +163,7 @@ plt.close()
 
 
 # %%
-random_seed = 188
+# random_seed = 188
 random_seed = int(time.time())
 start_time = str(time.ctime()).replace(':','-').replace(' ','_')
 start = time.time()
@@ -435,15 +435,12 @@ for epoch in range(epochs):
     pretty_print(f"train_roc: {train_roc}")
     pretty_print(f"valid_roc: {valid_roc}", pa=True)
 
-    if (epoch - best_param["roc_epoch"] > 50) and (epoch - best_param["loss_epoch"] > 75):        
+    if (epoch - best_param["roc_epoch"] > 18) and (epoch - best_param["loss_epoch"] > 28):        
         break
 
     train(model, train_df, optimizer, loss_function)
 
 pd.DataFrame.from_dict(epoch_meta).transpose().to_csv('saved_models/epoch_metadata.csv')
-
-tmp_epoch = pd.read_csv('saved_models/epoch_metadata.csv')
-tmp_epoch.transpose().to_csv('saved_models/epoch_metadata.csv')
 
 
 
