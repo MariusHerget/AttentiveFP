@@ -459,7 +459,7 @@ if TRAIN_MODELS:
                 best_param["loss_epoch"] = epoch
                 best_param["valid_loss"] = valid_loss
 
-            pretty_print(f"EPOCH: {epoch}", pb=3 if epoch == 0 else False)
+            pretty_print(f"RUN: {"0" if n < 10 else ""}{n} EPOCH: {epoch}", pb=3 if epoch == 0 else False)
             pretty_print(f"train_roc: {train_roc}")
             pretty_print(f"valid_roc: {valid_roc}", pa=True)
 
