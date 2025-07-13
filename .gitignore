@@ -1,7 +1,6 @@
 #saved_models/
 *.pickle
 *.pkl
-*.pth
 *.pkl.gz
 *.pkl.bz2
 *.pkl.xz
