@@ -17,6 +17,8 @@
 ### Helper Functions and global settings
 FORCE_CPU = False
 RECREATE_SETS = True
+TRAIN_MODELS = True
+RERUN = 5
 line_length = 60
 def pretty_print_divider(n=1, lb_n=0, char="#"):
     if isinstance(n, bool):
@@ -119,9 +121,11 @@ from numpy.polynomial.polynomial import polyfit
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib
+import mplfinance as mpf
 from IPython.display import SVG, display
 import seaborn as sns; sns.set(color_codes=True)
 
+os.makedirs('saved_models', exist_ok=True)
 
 # %%
 task_name = 'BBBP'
@@ -206,45 +210,54 @@ for i,task in enumerate(tasks):
     weights.append([(positive_df.shape[0]+negative_df.shape[0])/negative_df.shape[0],\
                     (positive_df.shape[0]+negative_df.shape[0])/positive_df.shape[0]])
     
-if not RECREATE_SETS:
-    valid_df = pd.read_csv("sets/valid_df.csv")
-    train_df = pd.read_csv("sets/train_df.csv")
-    test_df = pd.read_csv("sets/test_df.csv")
-else:    
-    test_df = remained_df.sample(frac=1/10, random_state=random_seed) # test set
-    training_data = remained_df.drop(test_df.index) # training data
+def create_sets(n=0):
+    folder = f'saved_models/run_{n}'
+    os.makedirs(f'folder', exist_ok=True)
+    os.makedirs(f'{folder}/sets', exist_ok=True)
+        
+    if not RECREATE_SETS and os.path.isfile(f'{folder}/sets/valid_df.csv'):
+        valid_df = pd.read_csv(f"{folder}/sets/valid_df.csv")
+        train_df = pd.read_csv(f"{folder}/sets/train_df.csv")
+        test_df = pd.read_csv(f"{folder}/sets/test_df.csv")
+    else:    
+        test_df = remained_df.sample(frac=1/10, random_state=random_seed) # test set
+        training_data = remained_df.drop(test_df.index) # training data
 
-    # training data is further divided into validation set and train set
-    valid_df = training_data.sample(frac=1/9, random_state=random_seed) # validation set
-    train_df = training_data.drop(valid_df.index) # train set
-    train_df = train_df.reset_index(drop=True)
-    valid_df = valid_df.reset_index(drop=True)
-    test_df = test_df.reset_index(drop=True)
+        # training data is further divided into validation set and train set
+        valid_df = training_data.sample(frac=1/9, random_state=random_seed) # validation set
+        train_df = training_data.drop(valid_df.index) # train set
+        train_df = train_df.reset_index(drop=True)
+        valid_df = valid_df.reset_index(drop=True)
+        test_df = test_df.reset_index(drop=True)
 
-    valid_df.to_csv('sets/valid_df.csv')
-    train_df.to_csv('sets/train_df.csv')
-    test_df.to_csv('sets/test_df.csv')
+        valid_df.to_csv(f'{folder}/sets/valid_df.csv')
+        train_df.to_csv(f'{folder}/sets/train_df.csv')
+        test_df.to_csv(f'{folder}/sets/test_df.csv')
+    return valid_df, train_df, test_df
 
 
 # %%
-x_atom, x_bonds, x_atom_index, x_bond_index, x_mask, smiles_to_rdkit_list = get_smiles_array([smilesList[0]],feature_dicts)
-num_atom_features = x_atom.shape[-1]
-num_bond_features = x_bonds.shape[-1]
+def create_model():
+    x_atom, x_bonds, x_atom_index, x_bond_index, x_mask, smiles_to_rdkit_list = get_smiles_array([smilesList[0]],feature_dicts)
+    num_atom_features = x_atom.shape[-1]
+    num_bond_features = x_bonds.shape[-1]
 
-loss_function = [nn.CrossEntropyLoss(torch.tensor(weight),reduction='mean') for weight in weights]
-model = Fingerprint(radius, T, num_atom_features,num_bond_features,
-            fingerprint_dim, output_units_num, p_dropout)
-model.to(device)
-# tensorboard = SummaryWriter(log_dir="runs/"+start_time+"_"+prefix_filename+"_"+str(fingerprint_dim)+"_"+str(p_dropout))
+    loss_function = [nn.CrossEntropyLoss(torch.tensor(weight),reduction='mean') for weight in weights]
+    model = Fingerprint(radius, T, num_atom_features,num_bond_features,
+                fingerprint_dim, output_units_num, p_dropout)
+    model.to(device)
+    # tensorboard = SummaryWriter(log_dir="runs/"+start_time+"_"+prefix_filename+"_"+str(fingerprint_dim)+"_"+str(p_dropout))
 
-# optimizer = optim.Adam(model.parameters(), learning_rate, weight_decay=weight_decay)
-optimizer = optim.Adam(model.parameters(), 10**-learning_rate, weight_decay=10**-weight_decay)
-model_parameters = filter(lambda p: p.requires_grad, model.parameters())
-params = sum([np.prod(p.size()) for p in model_parameters])
-pretty_print(f"Number of parameters: {params}")
-for name, param in model.named_parameters():
-    if param.requires_grad:
-        pretty_print(f"{name} {param.data.shape}")
+    # optimizer = optim.Adam(model.parameters(), learning_rate, weight_decay=weight_decay)
+    optimizer = optim.Adam(model.parameters(), 10**-learning_rate, weight_decay=10**-weight_decay)
+    model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+    params = sum([np.prod(p.size()) for p in model_parameters])
+    pretty_print(f"Number of parameters: {params}")
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            pretty_print(f"{name} {param.data.shape}")
+    
+    return model, optimizer, loss_function
 
 
 
@@ -357,46 +370,33 @@ def eval(model, dataset):
 
 
 # %%
-best_param ={}
-best_param["roc_epoch"] = 0
-best_param["loss_epoch"] = 0
-best_param["valid_roc"] = 0
-best_param["valid_loss"] = 9e8
+if TRAIN_MODELS:
+    os.rmdir("saved_models")
+    os.makedirs("saved_models", exist_ok=True)
+    for n in range(RERUN):
+        valid_df, train_df, test_df = create_sets(n)
+        folder = f'saved_models/run_{n}'
+        folder_models = f'{folder}/models'
+        folder_stats = f'{folder}/stats'
+        os.makedirs(folder_models, exist_ok=True)
+        os.makedirs(folder_stats, exist_ok=True)
 
-epoch_meta = {}
-
-for epoch in range(epochs):    
-    train_roc, train_prc, train_precision, train_recall, train_loss = eval(model, train_df)
-    valid_roc, valid_prc, valid_precision, valid_recall, valid_loss = eval(model, valid_df)
-    train_roc_mean = np.array(train_roc).mean()
-    valid_roc_mean = np.array(valid_roc).mean()
-    epoch_meta[epoch] = {
-        'train_roc': train_roc,
-        'train_prc': train_prc,
-        'train_precision': train_precision,
-        'train_recall': train_recall,
-        'train_loss': train_loss,
-        'valid_roc': valid_roc,
-        'valid_prc': valid_prc,
-        'valid_precision': valid_precision,
-        'valid_recall': valid_recall,
-        'valid_loss': valid_loss
-    }
-
-    # tensorboard.add_scalars('ROC',{'train_roc':train_roc_mean,'valid_roc':valid_roc_mean},epoch)
-    # tensorboard.add_scalars('Losses',{'train_losses':train_loss,'valid_losses':valid_loss},epoch)
-
-    if valid_roc_mean > best_param["valid_roc"]:
-        best_param["roc_epoch"] = epoch
-        best_param["valid_roc"] = valid_roc_mean
+        model, optimizer, loss_function = create_model()
         
-        if valid_roc_mean > 0.87:
-            name = 'saved_models/model_'+prefix_filename+'_'+start_time+'_'+str(epoch)+'.pt'
-            torch.save(model, name)  
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
+        best_param ={}
+        best_param["roc_epoch"] = 0
+        best_param["loss_epoch"] = 0
+        best_param["valid_roc"] = 0
+        best_param["valid_loss"] = 9e8
+
+        epoch_meta = {}
+
+        for epoch in range(epochs):    
+            train_roc, train_prc, train_precision, train_recall, train_loss = eval(model, train_df)
+            valid_roc, valid_prc, valid_precision, valid_recall, valid_loss = eval(model, valid_df)
+            train_roc_mean = np.array(train_roc).mean()
+            valid_roc_mean = np.array(valid_roc).mean()
+            epoch_meta[epoch] = {
                 'train_roc': train_roc,
                 'train_prc': train_prc,
                 'train_precision': train_precision,
@@ -407,152 +407,286 @@ for epoch in range(epochs):
                 'valid_precision': valid_precision,
                 'valid_recall': valid_recall,
                 'valid_loss': valid_loss
-            }, name+'h')
-            pd.DataFrame.from_dict(epoch_meta).transpose().to_csv('saved_models/epoch_metadata.csv')
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'train_roc': train_roc,
-                'train_prc': train_prc,
-                'train_precision': train_precision,
-                'train_recall': train_recall,
-                'train_loss': train_loss,
-                'valid_roc': valid_roc,
-                'valid_prc': valid_prc,
-                'valid_precision': valid_precision,
-                'valid_recall': valid_recall,
-                'valid_loss': valid_loss
-            }, 'saved_models/best_model.pth')
-            torch.save(model, 'saved_models/best_model.pt')  
+            }
+
+            # tensorboard.add_scalars('ROC',{'train_roc':train_roc_mean,'valid_roc':valid_roc_mean},epoch)
+            # tensorboard.add_scalars('Losses',{'train_losses':train_loss,'valid_losses':valid_loss},epoch)
+
+            if valid_roc_mean > best_param["valid_roc"]:
+                best_param["roc_epoch"] = epoch
+                best_param["valid_roc"] = valid_roc_mean
+                
+                if valid_roc_mean > 0.8:
+                    name = f'{folder_models}/model_'+prefix_filename+'_'+start_time+'_'+str(epoch)+'.pt'
+                    torch.save(model, name)  
+                    torch.save({
+                        'epoch': epoch,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'train_roc': train_roc,
+                        'train_prc': train_prc,
+                        'train_precision': train_precision,
+                        'train_recall': train_recall,
+                        'train_loss': train_loss,
+                        'valid_roc': valid_roc,
+                        'valid_prc': valid_prc,
+                        'valid_precision': valid_precision,
+                        'valid_recall': valid_recall,
+                        'valid_loss': valid_loss
+                    }, name+'h')
+                    pd.DataFrame.from_dict(epoch_meta).transpose().to_csv(f'{folder_stats}/epoch_metadata.csv')
+                    torch.save({
+                        'epoch': epoch,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'train_roc': train_roc,
+                        'train_prc': train_prc,
+                        'train_precision': train_precision,
+                        'train_recall': train_recall,
+                        'train_loss': train_loss,
+                        'valid_roc': valid_roc,
+                        'valid_prc': valid_prc,
+                        'valid_precision': valid_precision,
+                        'valid_recall': valid_recall,
+                        'valid_loss': valid_loss
+                    }, f'{folder}/best_model.pth')
+                    torch.save(model, f'{folder}/best_model.pt')  
 
 
-    if valid_loss < best_param["valid_loss"]:
-        best_param["loss_epoch"] = epoch
-        best_param["valid_loss"] = valid_loss
+            if valid_loss < best_param["valid_loss"]:
+                best_param["loss_epoch"] = epoch
+                best_param["valid_loss"] = valid_loss
 
-    pretty_print(f"EPOCH: {epoch}", pb=3 if epoch == 0 else False)
-    pretty_print(f"train_roc: {train_roc}")
-    pretty_print(f"valid_roc: {valid_roc}", pa=True)
+            pretty_print(f"EPOCH: {epoch}", pb=3 if epoch == 0 else False)
+            pretty_print(f"train_roc: {train_roc}")
+            pretty_print(f"valid_roc: {valid_roc}", pa=True)
 
-    if (epoch - best_param["roc_epoch"] > 18) and (epoch - best_param["loss_epoch"] > 28):        
-        break
+            if (epoch - best_param["roc_epoch"] > 18) and (epoch - best_param["loss_epoch"] > 28):
+                break
 
-    train(model, train_df, optimizer, loss_function)
+            train(model, train_df, optimizer, loss_function)
 
-pd.DataFrame.from_dict(epoch_meta).transpose().to_csv('saved_models/epoch_metadata.csv')
+        pd.DataFrame.from_dict(epoch_meta).transpose().to_csv(f'{folder_stats}/epoch_metadata.csv')
+
+        # evaluate model
+        best_model_eval = torch.load(f'{folder}/best_model.pt', weights_only=False)
+        best_model = torch.load(f'{folder}/best_model.pth', weights_only=False)
+        model.load_state_dict(best_model['model_state_dict'])
+        epoch = best_model['epoch']
 
 
+
+        # best_model_dict = best_model.state_dict()
+        # best_model_wts = copy.deepcopy(best_model_dict)
+
+        # model.load_state_dict(best_model_wts)
+        # (best_model.align[0].weight == model.align[0].weight).all()
+
+        test_roc, test_prc, test_precision, test_recall, test_losses = eval(best_model_eval, test_df)
+
+        meta_best = {
+            'epoch': best_model['epoch'],
+            'train_roc': best_model['train_roc'],
+            'train_prc': best_model['train_prc'],
+            'train_precision': best_model['train_precision'],
+            'train_recall': best_model['train_recall'],
+            'train_loss': best_model['train_loss'],
+            'valid_roc': best_model['valid_roc'],
+            'valid_prc': best_model['valid_prc'],
+            'valid_precision': best_model['valid_precision'],
+            'valid_recall': best_model['valid_recall'],
+            'valid_loss': best_model['valid_loss'],
+            'test_roc': test_roc,
+            'test_prc': test_prc,
+            'test_precision': test_precision,
+            'test_recall': test_recall,
+            'test_losses': test_losses
+        }
+
+        pretty_print(f"best epoch: {epoch}", pb=True)
+        pretty_print(f"test_roc: {test_roc}")
+        pretty_print(f"test_roc_mean: {np.array(test_roc).mean()}", pa=True)
+
+        pd.DataFrame.from_dict(meta_best).to_csv(f'{folder_stats}/best_model_metadata.csv')
 
 # %%
-# evaluate model
-best_model_eval = torch.load('saved_models/best_model.pt')
-best_model = torch.load('saved_models/best_model.pth')
-model.load_state_dict(best_model['model_state_dict'])
-epoch = best_model['epoch']
+smiles_to_test = ['O=C(C)Oc1ccccc1C(=O)O']
+folder_eval = 'saved_models/eval'
+os.makedirs(f'{folder_eval}', exist_ok=True)
+records = []
+for smile_to_test in smiles_to_test:
+    for n in range(RERUN):
+        folder = f'saved_models/run_{n}'
+        # Inference on a single SMILES string
+        model_filepath = f'{folder}/best_model.pt'
+
+        if os.path.isfile(model_filepath):
+            pretty_print(f"Loading model from {model_filepath}", pb=True)
+            model = torch.load(model_filepath, map_location=device, weights_only=False)
+            model.eval()
+
+            pretty_print(f"Running inference for SMILES: {smile_to_test}")
+
+            try:
+                # Featurize the SMILES string using the new function
+                x_atom, x_bonds, x_atom_index, x_bond_index, x_mask = featurize_smiles_from_dict(smile_to_test, feature_dicts)
+
+                # Convert numpy arrays to tensors
+                x_atom_tensor = torch.tensor(x_atom)
+                x_bonds_tensor = torch.tensor(x_bonds)
+                x_atom_index_tensor = torch.tensor(x_atom_index, dtype=torch.long)
+                x_bond_index_tensor = torch.tensor(x_bond_index, dtype=torch.long)
+                x_mask_tensor = torch.tensor(x_mask)
+                
+                # Perform prediction
+                with torch.no_grad():
+                    _, mol_prediction = model(x_atom_tensor, x_bonds_tensor, x_atom_index_tensor, x_bond_index_tensor, x_mask_tensor)
+
+                # Process the output
+                probabilities = F.softmax(mol_prediction, dim=1)
+                prob_class_0 = probabilities[0, 0].item()
+                prob_class_1 = probabilities[0, 1].item()
+                predicted_class = torch.argmax(probabilities, dim=1).item()
+
+                pretty_print(f"Raw model output (logits): {mol_prediction.cpu().numpy().flatten()}", pa=True)
+
+                # BBBP classification (1: Penetrates, 0: Doesn't Penetrate)
+                
+                pretty_print(f"Prediction for SMILES: {smile_to_test}", pb=True)
+                pretty_print(f"Probability of NOT crossing BBB (class 0): {prob_class_0:.4f}")
+                pretty_print(f"Probability of crossing BBB (class 1): {prob_class_1:.4f}")
+                pretty_print(f"Predicted class: {predicted_class} ({'Crosses BBB' if predicted_class == 1 else 'Does not cross BBB'})", pa=True)
+
+                records.append({
+                    'smile': smile_to_test,
+                    'run': n,
+                    'mol_prediction': mol_prediction.cpu().numpy().flatten(),           # raw logits
+                    'probabilities': probabilities.cpu().numpy(),             # full softmax vector
+                    'prob_class_0': prob_class_0,
+                    'prob_class_1': prob_class_1,
+                    'predicted_class': predicted_class
+                })
+
+            except ValueError as e:
+                print(f"Error featurizing SMILES: {e}")
+            except Exception as e:
+                print(f"An unexpected error occurred: {e}")
 
 
+        else:
+            print(f"Model file not found at: {model_filepath}")
 
-# best_model_dict = best_model.state_dict()
-# best_model_wts = copy.deepcopy(best_model_dict)
-
-# model.load_state_dict(best_model_wts)
-# (best_model.align[0].weight == model.align[0].weight).all()
-
-test_roc, test_prc, test_precision, test_recall, test_losses = eval(best_model_eval, test_df)
-
-meta_best = {
-    'epoch': best_model['epoch'],
-    'train_roc': best_model['train_roc'],
-    'train_prc': best_model['train_prc'],
-    'train_precision': best_model['train_precision'],
-    'train_recall': best_model['train_recall'],
-    'train_loss': best_model['train_loss'],
-    'valid_roc': best_model['valid_roc'],
-    'valid_prc': best_model['valid_prc'],
-    'valid_precision': best_model['valid_precision'],
-    'valid_recall': best_model['valid_recall'],
-    'valid_loss': best_model['valid_loss'],
-    'test_roc': test_roc,
-    'test_prc': test_prc,
-    'test_precision': test_precision,
-    'test_recall': test_recall,
-    'test_losses': test_losses
-}
-
-pretty_print(f"best epoch: {epoch}", pb=True)
-pretty_print(f"test_roc: {test_roc}")
-pretty_print(f"test_roc_mean: {np.array(test_roc).mean()}", pa=True)
-
-pd.DataFrame.from_dict(meta_best).to_csv('saved_models/best_model_metadata.csv')
+    # Assemble DataFrame with composite index
+    if records:  # Only create DataFrame if we have records
+        df = pd.DataFrame.from_records(records).set_index(['smile', 'run'])
+        df.index.names = ['smile', 'run']
+        df.to_csv(f'{folder_eval}/results.csv')
+        pretty_print(f"Saved {len(records)} prediction records to {folder_eval}/results.csv", pb=True, pa=True)
+    else:
+        pretty_print("No prediction records were created. Check if model files exist and inference completed successfully.", pb=True, pa=True)
+        # Create an empty DataFrame to prevent the next section from failing
+        df = pd.DataFrame(columns=['smile', 'run', 'mol_prediction', 'probabilities', 'prob_class_0', 'prob_class_1', 'predicted_class'])
+        df.to_csv(f'{folder_eval}/results.csv', index=False)
 
 # %%
-# Inference on a single SMILES string
-model_filepath = 'saved_models/best_model.pt'
-smile_to_test = 'O=C(C)Oc1ccccc1C(=O)O'
-# smile_to_test = 'O=C(C)Oc1ccccc1C(=O)O' # Aspirin
+# Do typical stats on the saved results
+folder_eval = 'saved_models/eval'
+if os.path.exists(f"{folder_eval}/results.csv") and os.path.getsize(f"{folder_eval}/results.csv") > 0:
+    df = pd.read_csv(f"{folder_eval}/results.csv", index_col=[0, 1])
+    df.index.names = ['smile', 'run']
+    grp = df.groupby(level='smile')
 
-if os.path.isfile(model_filepath):
-    pretty_print(f"Loading model from {model_filepath}", pb=True)
-    model = torch.load(model_filepath, map_location=device, weights_only=False)
-    model.eval()
+    # Compute basic stats
+    stats = grp.agg(
+        p0_mean=('prob_class_0', 'mean'),
+        p0_std=('prob_class_0', 'std'),
+        p0_var=('prob_class_0', 'var'),
+        p0_min=('prob_class_0', 'min'),
+        p0_max=('prob_class_0', 'max'),
+        p0_median=('prob_class_0', 'median'),
+        p0_q1=('prob_class_0', lambda x: x.quantile(0.25)),
+        p0_q3=('prob_class_0', lambda x: x.quantile(0.75)),
+        p1_mean=('prob_class_1', 'mean'),
+        p1_std=('prob_class_1', 'std'),
+        p1_var=('prob_class_1', 'var'),
+        p1_min=('prob_class_1', 'min'),
+        p1_max=('prob_class_1', 'max'),
+        p1_median=('prob_class_1', 'median'),
+        p1_q1=('prob_class_1', lambda x: x.quantile(0.25)),
+        p1_q3=('prob_class_1', lambda x: x.quantile(0.75)),
+        pred_mode=('predicted_class', lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0]),
+        pred_nunique=('predicted_class', 'nunique')
+    )
 
-    pretty_print(f"Running inference for SMILES: {smile_to_test}")
 
-    try:
-        # Featurize the SMILES string using the new function
-        x_atom, x_bonds, x_atom_index, x_bond_index, x_mask = featurize_smiles_from_dict(smile_to_test, feature_dicts)
+    # Step 3: Save the stats DataFrame to a new CSV
+    stats.to_csv(f"{folder_eval}/results_stats.csv")
 
-        # Convert numpy arrays to tensors
-        x_atom_tensor = torch.tensor(x_atom)
-        x_bonds_tensor = torch.tensor(x_bonds)
-        x_atom_index_tensor = torch.tensor(x_atom_index, dtype=torch.long)
-        x_bond_index_tensor = torch.tensor(x_bond_index, dtype=torch.long)
-        x_mask_tensor = torch.tensor(x_mask)
-        
-        # Perform prediction
-        with torch.no_grad():
-            _, mol_prediction = model(x_atom_tensor, x_bonds_tensor, x_atom_index_tensor, x_bond_index_tensor, x_mask_tensor)
+    pretty_print(f"Loaded {len(df)} rows from 'results.csv'", pb=True)
+    pretty_print(f"Saved aggregated stats with {len(stats)} smiles to 'results_stats.csv'", pa=True)
 
-        # Process the output
-        probabilities = F.softmax(mol_prediction, dim=1)
-        prob_class_0 = probabilities[0, 0].item()
-        prob_class_1 = probabilities[0, 1].item()
-        predicted_class = torch.argmax(probabilities, dim=1).item()
+    # Error Bar plot
+    fig, ax = plt.subplots(figsize=(10,6))
+    x = np.arange(len(stats))
+    ax.errorbar(x - 0.1, stats['p0_mean'], yerr=stats['p0_std'], fmt='o', label='Class 0')
+    ax.errorbar(x + 0.1, stats['p1_mean'], yerr=stats['p1_std'], fmt='o', label='Class 1')
+    ax.set_xticks(x)
+    ax.set_xticklabels(stats.index, rotation=45, ha='right')
+    ax.set_ylabel('Probability')
+    ax.set_title('Mean ± STD of Class Probabilities per SMILE')
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(f"{folder_eval}/prob_errorbars.png", dpi=150)
+    plt.close(fig)
+    pretty_print(f"Saved error bar plot to {folder_eval}/prob_errorbars.png", pb=True, pa=True)
 
-        pretty_print(f"Raw model output (logits): {mol_prediction.cpu().numpy().flatten()}", pa=True)
+    # Candlestick-style plot
+    # Helper to create OHLC frame for a given class
+    def get_ohlc(df, prob_col):
+        # The data is already indexed by 'smile' and 'run', so groupby 'smile' (level=0)
+        # and then for each group, calculate ohlc.
+        # iloc[0] and iloc[-1] depend on the order of runs. Let's assume they are stored sequentially.
+        ohlc = df.groupby(level='smile')[prob_col].agg(
+            open='first',
+            high='max',
+            low='min',
+            close='last'
+        )
+        return ohlc
 
-        # BBBP classification (1: Penetrates, 0: Doesn't Penetrate)
-        
-        pretty_print(f"Prediction for SMILES: {smile_to_test}", pb=True)
-        pretty_print(f"Probability of NOT crossing BBB (class 0): {prob_class_0:.4f}")
-        pretty_print(f"Probability of crossing BBB (class 1): {prob_class_1:.4f}")
-        pretty_print(f"Predicted class: {predicted_class} ({'Crosses BBB' if predicted_class == 1 else 'Does not cross BBB'})", pa=True)
+    # For prob_class_0
+    ohlc_p0 = get_ohlc(df, 'prob_class_0')
+    if not ohlc_p0.empty:
+        original_index = ohlc_p0.index
+        ohlc_p0.index = pd.to_datetime(np.arange(len(ohlc_p0)), unit='D')
+        fig, ax = mpf.plot(ohlc_p0, type='candle', style='yahoo',
+                        title='Candlestick of Probabilities for Class 0 (Does not cross BBB)',
+                        ylabel='Probability',
+                        returnfig=True,
+                        figsize=(12, 7))
+        ax[0].set_xticks(range(len(original_index)))
+        ax[0].set_xticklabels(original_index, rotation=45, ha='right')
+        fig.tight_layout()
+        fig.savefig(f"{folder_eval}/candlestick_prob0.png", dpi=150)
+        plt.close(fig)
+        pretty_print(f"Saved candlestick plot for class 0 to {folder_eval}/candlestick_prob0.png", pa=True)
 
-    except ValueError as e:
-        print(f"Error featurizing SMILES: {e}")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-
+    # For prob_class_1
+    ohlc_p1 = get_ohlc(df, 'prob_class_1')
+    if not ohlc_p1.empty:
+        original_index = ohlc_p1.index
+        ohlc_p1.index = pd.to_datetime(np.arange(len(ohlc_p1)), unit='D')
+        fig, ax = mpf.plot(ohlc_p1, type='candle', style='yahoo',
+                        title='Candlestick of Probabilities for Class 1 (Crosses BBB)',
+                        ylabel='Probability',
+                        returnfig=True,
+                        figsize=(12, 7))
+        ax[0].set_xticks(range(len(original_index)))
+        ax[0].set_xticklabels(original_index, rotation=45, ha='right')
+        fig.tight_layout()
+        fig.savefig(f"{folder_eval}/candlestick_prob1.png", dpi=150)
+        plt.close(fig)
+        pretty_print(f"Saved candlestick plot for class 1 to {folder_eval}/candlestick_prob1.png", pa=True)
 
 else:
-    print(f"Model file not found at: {model_filepath}")
-
-# %%
-# smile = smile_to_test
-# ai_x_atom, ai_x_bonds, ai_x_atom_index, ai_x_bond_index, ai_x_mask = featurize_smiles_from_dict(smile, feature_dicts)
-# orig_x_atom, orig_x_bonds, orig_x_atom_index, orig_x_bond_index, orig_x_mask, smiles_to_rdkit_list = get_smiles_array([smile],feature_dicts)
-
-# print("Is equal?")
-# print("x_atom", ai_x_atom.shape, orig_x_atom.shape)
-# np.testing.assert_array_equal(ai_x_atom, orig_x_atom)
-# print("x_bonds", ai_x_bonds.shape, orig_x_bonds.shape)
-# np.testing.assert_array_equal(ai_x_bonds, orig_x_bonds)
-# print("x_atom_index", ai_x_atom_index.shape, orig_x_atom_index.shape)
-# np.testing.assert_array_equal(ai_x_atom_index, orig_x_atom_index)
-# print("x_bond_index", ai_x_bond_index.shape, orig_x_bond_index.shape)
-# np.testing.assert_array_equal(ai_x_bond_index, orig_x_bond_index)
-# print("x_mask", ai_x_mask.shape, orig_x_mask.shape)
-# np.testing.assert_array_equal(ai_x_mask, orig_x_mask)
-
-# # %%
+    pretty_print("No results file found or file is empty. Skipping statistics generation.", pb=True, pa=True)
