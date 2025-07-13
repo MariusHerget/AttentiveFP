@@ -19,7 +19,7 @@ FORCE_CPU = False
 RECREATE_SETS = True
 TRAIN_MODELS = True
 SAVE_MODELS = True
-RERUN = 2
+RERUN = 3
 MAIN_FOLDER = '../saved_models'
 line_length = 60
 def pretty_print_divider(n=1, lb_n=0, char="#"):
