@@ -18,7 +18,8 @@
 FORCE_CPU = False
 RECREATE_SETS = True
 TRAIN_MODELS = True
-RERUN = 5
+SAVE_MODELS = True
+RERUN = 2
 MAIN_FOLDER = '../saved_models'
 line_length = 60
 def pretty_print_divider(n=1, lb_n=0, char="#"):
@@ -205,6 +206,7 @@ uncovered_df
 
 
 # %%
+pretty_print(f"Creating weights", lb_n=2, pb=True, pa=True)
 weights = []
 for i,task in enumerate(tasks):    
     negative_df = remained_df[remained_df[task] == 0][["smiles",task]]
@@ -213,6 +215,7 @@ for i,task in enumerate(tasks):
                     (positive_df.shape[0]+negative_df.shape[0])/positive_df.shape[0]])
     
 def create_sets(n=0):
+    pretty_print(f"Creating sets for run {n}", lb_n=2, pb=True)
     folder = f'{MAIN_FOLDER}/run_{n}'
     os.makedirs(f'{folder}', exist_ok=True)
     os.makedirs(f'{folder}/sets', exist_ok=True)
@@ -418,25 +421,12 @@ if TRAIN_MODELS:
                 best_param["roc_epoch"] = epoch
                 best_param["valid_roc"] = valid_roc_mean
                 
-                if valid_roc_mean > 0.9:
+                if valid_roc_mean > 0.87 and SAVE_MODELS:
                     name = f'{folder_models}/model_'+prefix_filename+'_'+start_time+'_'+str(epoch)+'.pt'
                     torch.save(model, name)  
-                    torch.save({
-                        'epoch': epoch,
-                        'model_state_dict': model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                        'train_roc': train_roc,
-                        'train_prc': train_prc,
-                        'train_precision': train_precision,
-                        'train_recall': train_recall,
-                        'train_loss': train_loss,
-                        'valid_roc': valid_roc,
-                        'valid_prc': valid_prc,
-                        'valid_precision': valid_precision,
-                        'valid_recall': valid_recall,
-                        'valid_loss': valid_loss
-                    }, name+'h')
-                    pd.DataFrame.from_dict(epoch_meta).transpose().to_csv(f'{folder_stats}/epoch_metadata.csv')
+                
+                # Custom: save best model seperately and save epoch metadata
+                pd.DataFrame.from_dict(epoch_meta).transpose().to_csv(f'{folder_stats}/epoch_metadata.csv')
                 torch.save({
                     'epoch': epoch,
                     'model_state_dict': model.state_dict(),
