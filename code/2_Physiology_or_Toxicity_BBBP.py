@@ -169,7 +169,7 @@ plt.close()
 
 
 # %%
-# random_seed = 188
+random_seed = 188
 random_seed = int(time.time())
 start_time = str(time.ctime()).replace(':','-').replace(' ','_')
 start = time.time()
