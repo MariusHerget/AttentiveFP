@@ -132,7 +132,7 @@ os.makedirs(f'{MAIN_FOLDER}', exist_ok=True)
 # %%
 task_name = 'BBBP'
 tasks = ['BBBP']
-raw_filename = "../data/BBBP.csv"
+raw_filename = "../data/B3DB.csv"
 feature_filename = raw_filename.replace('.csv','.pickle')
 filename = raw_filename.replace('.csv','')
 prefix_filename = raw_filename.split('/')[-1].replace('.csv','')
