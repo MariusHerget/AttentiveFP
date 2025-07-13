@@ -19,6 +19,7 @@ FORCE_CPU = False
 RECREATE_SETS = True
 TRAIN_MODELS = True
 RERUN = 5
+MAIN_FOLDER = '../saved_models'
 line_length = 60
 def pretty_print_divider(n=1, lb_n=0, char="#"):
     if isinstance(n, bool):
@@ -87,6 +88,7 @@ sys.setrecursionlimit(50000)
 import pickle
 import json
 import csv
+import shutil
 
 # from tensorboardX import SummaryWriter
 
@@ -125,7 +127,7 @@ import mplfinance as mpf
 from IPython.display import SVG, display
 import seaborn as sns; sns.set(color_codes=True)
 
-os.makedirs('saved_models', exist_ok=True)
+os.makedirs(f'{MAIN_FOLDER}', exist_ok=True)
 
 # %%
 task_name = 'BBBP'
@@ -211,8 +213,8 @@ for i,task in enumerate(tasks):
                     (positive_df.shape[0]+negative_df.shape[0])/positive_df.shape[0]])
     
 def create_sets(n=0):
-    folder = f'saved_models/run_{n}'
-    os.makedirs(f'folder', exist_ok=True)
+    folder = f'{MAIN_FOLDER}/run_{n}'
+    os.makedirs(f'{folder}', exist_ok=True)
     os.makedirs(f'{folder}/sets', exist_ok=True)
         
     if not RECREATE_SETS and os.path.isfile(f'{folder}/sets/valid_df.csv'):
@@ -371,11 +373,11 @@ def eval(model, dataset):
 
 # %%
 if TRAIN_MODELS:
-    os.rmdir("saved_models")
-    os.makedirs("saved_models", exist_ok=True)
+    shutil.rmtree(f'{MAIN_FOLDER}')
+    os.makedirs(f'{MAIN_FOLDER}', exist_ok=True)
     for n in range(RERUN):
         valid_df, train_df, test_df = create_sets(n)
-        folder = f'saved_models/run_{n}'
+        folder = f'{MAIN_FOLDER}/run_{n}'
         folder_models = f'{folder}/models'
         folder_stats = f'{folder}/stats'
         os.makedirs(folder_models, exist_ok=True)
@@ -511,12 +513,12 @@ if TRAIN_MODELS:
 
 # %%
 smiles_to_test = ['O=C(C)Oc1ccccc1C(=O)O']
-folder_eval = 'saved_models/eval'
+folder_eval = f'{MAIN_FOLDER}/eval'
 os.makedirs(f'{folder_eval}', exist_ok=True)
 records = []
 for smile_to_test in smiles_to_test:
     for n in range(RERUN):
-        folder = f'saved_models/run_{n}'
+        folder = f'{MAIN_FOLDER}/run_{n}'
         # Inference on a single SMILES string
         model_filepath = f'{folder}/best_model.pt'
 
@@ -590,7 +592,7 @@ for smile_to_test in smiles_to_test:
 
 # %%
 # Do typical stats on the saved results
-folder_eval = 'saved_models/eval'
+folder_eval = f'{MAIN_FOLDER}/eval'
 if os.path.exists(f"{folder_eval}/results.csv") and os.path.getsize(f"{folder_eval}/results.csv") > 0:
     df = pd.read_csv(f"{folder_eval}/results.csv", index_col=[0, 1])
     df.index.names = ['smile', 'run']
