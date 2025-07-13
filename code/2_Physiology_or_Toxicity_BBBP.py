@@ -418,7 +418,7 @@ if TRAIN_MODELS:
                 best_param["roc_epoch"] = epoch
                 best_param["valid_roc"] = valid_roc_mean
                 
-                if valid_roc_mean > 0.8:
+                if valid_roc_mean > 0.9:
                     name = f'{folder_models}/model_'+prefix_filename+'_'+start_time+'_'+str(epoch)+'.pt'
                     torch.save(model, name)  
                     torch.save({
@@ -437,22 +437,22 @@ if TRAIN_MODELS:
                         'valid_loss': valid_loss
                     }, name+'h')
                     pd.DataFrame.from_dict(epoch_meta).transpose().to_csv(f'{folder_stats}/epoch_metadata.csv')
-                    torch.save({
-                        'epoch': epoch,
-                        'model_state_dict': model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                        'train_roc': train_roc,
-                        'train_prc': train_prc,
-                        'train_precision': train_precision,
-                        'train_recall': train_recall,
-                        'train_loss': train_loss,
-                        'valid_roc': valid_roc,
-                        'valid_prc': valid_prc,
-                        'valid_precision': valid_precision,
-                        'valid_recall': valid_recall,
-                        'valid_loss': valid_loss
-                    }, f'{folder}/best_model.pth')
-                    torch.save(model, f'{folder}/best_model.pt')  
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'train_roc': train_roc,
+                    'train_prc': train_prc,
+                    'train_precision': train_precision,
+                    'train_recall': train_recall,
+                    'train_loss': train_loss,
+                    'valid_roc': valid_roc,
+                    'valid_prc': valid_prc,
+                    'valid_precision': valid_precision,
+                    'valid_recall': valid_recall,
+                    'valid_loss': valid_loss
+                }, f'{folder}/best_model.pth')
+                torch.save(model, f'{folder}/best_model.pt')  
 
 
             if valid_loss < best_param["valid_loss"]:
