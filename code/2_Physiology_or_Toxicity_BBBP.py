@@ -502,7 +502,23 @@ if TRAIN_MODELS:
         pd.DataFrame.from_dict(meta_best).to_csv(f'{folder_stats}/best_model_metadata.csv')
 
 # %%
-smiles_to_test = ['O=C(C)Oc1ccccc1C(=O)O']
+smiles_to_test = ['O=O',                                                                    # oxygen
+                  'C(=O)=O',                                                                # carbon dioxide
+                  'CCO',                                                                    # ethanol        
+                  'CN1CCC[C@H]1C2=CN=CC=C2',                                                # nicotine
+                  'CN1C=NC2=C1C(=O)N(C(=O)N2C)C',                                           # caffeine
+                  'CN(C)CCOC(C1=CC=CC=C1)C2=CC=CC=C2',                                      # diphenhydramine
+                  'CN1C(=O)CN=C(C2=C1C=CC(=C2)Cl)C3=CC=CC=C3',                              # diazepam
+                  'C1C(=O)NC2=C(C=C(C=C2)Br)C(=N1)C3=CC=CC=C3Cl',                           # phenazepam
+                  'C([C@@H]1[C@H]([C@@H]([C@H](C(O1)O)O)O)O)O',                             # glucose
+                  'C1=CC(=C(C=C1C[C@@H](C(=O)O)N)O)O',                                      # levodopa
+                  'C1=CC(=CC=C1C[C@@H](C(=O)O)N)N(CCCl)CCCl',                               # melphalan
+                  'C1CCC(CC1)(CC(=O)O)CN',                                                  # gabapentin
+                  'CN(C)C(=O)C(CCN1CCC(CC1)(C2=CC=C(C=C2)Cl)O)(C3=CC=CC=C3)C4=CC=CC=C4',    # loperamide
+                  'CCOC(=O)N1CCC(=C2C3=C(CCC4=C2N=CC=C4)C=C(C=C3)Cl)CC1',                   # loratadine
+                  'C[C@H](C1=CC(=C(C=C1)C2=CC=CC=C2)F)C(=O)O',                              # tarenflurbil
+                  'CC1(C(N2C(S1)C(C2=O)NC(=O)CC3=CC=CC=C3)C(=O)O)C',                        # penicillin
+                  'C1=CC(=C(C=C1CCN)O)O']                                                   # dopamine
 folder_eval = f'{MAIN_FOLDER}/eval'
 os.makedirs(f'{folder_eval}', exist_ok=True)
 records = []
